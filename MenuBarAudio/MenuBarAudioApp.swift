@@ -1,17 +1,16 @@
-//
-//  MenuBarAudioApp.swift
-//  MenuBarAudio
-//
-//  Created by Jason H Stancil on 3/22/26.
-//
-
 import SwiftUI
+import Cocoa
 
 @main
 struct MenuBarAudioApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    var body: some Scene { Settings { EmptyView() } }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var menuController: MenuController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        menuController = MenuController()
     }
 }
