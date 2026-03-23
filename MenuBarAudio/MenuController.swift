@@ -1,4 +1,5 @@
 import Cocoa
+import CoreAudio
 
 class MenuController: NSObject {
 
@@ -6,15 +7,22 @@ class MenuController: NSObject {
     let menu = NSMenu()
     let audioController = AudioController()
 
+    private var outputDeviceAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+
     override init() {
         super.init()
         setupMenu()
+        setupOutputDeviceListener()
         updateStatusIcon()
     }
 
-    func setupMenu() {
-        statusItem.button?.title = AppConfig.apolloLabel
 
+
+    func setupMenu() {
         let apolloItem = NSMenuItem(title: AppConfig.apolloLabel, action: #selector(switchToApollo), keyEquivalent: "")
         apolloItem.target = self
         menu.addItem(apolloItem)
@@ -32,14 +40,24 @@ class MenuController: NSObject {
         statusItem.menu = menu
     }
 
+    func setupOutputDeviceListener() {
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &outputDeviceAddress,
+            DispatchQueue.main
+        ) { [weak self] _, _ in
+            self?.updateStatusIcon()
+        }
+    }
+
     @objc func switchToApollo() {
         audioController.switchToApollo()
-        statusItem.button?.title = AppConfig.apolloLabel
+        updateStatusIcon()
     }
 
     @objc func switchToSamsung() {
         audioController.switchToSamsung()
-        statusItem.button?.title = AppConfig.samsungLabel
+        updateStatusIcon()
     }
 
     @objc func quitApp() {
@@ -47,6 +65,17 @@ class MenuController: NSObject {
     }
 
     func updateStatusIcon() {
-        statusItem.button?.title = AppConfig.apolloLabel
+        guard let currentName = audioController.currentOutputDeviceName() else {
+            statusItem.button?.title = "?"
+            return
+        }
+
+        if currentName.contains(AppConfig.apolloMatch) {
+            statusItem.button?.title = AppConfig.apolloLabel
+        } else if currentName.contains(AppConfig.samsungMatch) {
+            statusItem.button?.title = AppConfig.samsungLabel
+        } else {
+            statusItem.button?.title = currentName
+        }
     }
 }

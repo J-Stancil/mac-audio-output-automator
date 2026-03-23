@@ -11,8 +11,30 @@ class AudioController {
         switchDevice(containing: AppConfig.samsungMatch)
     }
 
-    private func switchDevice(containing nameFragment: String) {
+    func currentOutputDeviceName() -> String? {
+        var deviceID = AudioDeviceID(0)
+        var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
 
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &dataSize,
+            &deviceID
+        )
+
+        guard status == noErr else { return nil }
+        return getDeviceName(deviceID)
+    }
+
+    private func switchDevice(containing nameFragment: String) {
         guard let deviceID = findOutputDevice(containing: nameFragment) else {
             print("Device not found: \(nameFragment)")
             return
@@ -22,7 +44,6 @@ class AudioController {
     }
 
     private func findOutputDevice(containing substring: String) -> AudioDeviceID? {
-
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -38,7 +59,6 @@ class AudioController {
         AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &deviceIDs)
 
         for deviceID in deviceIDs {
-
             if let name = getDeviceName(deviceID),
                name.contains(substring),
                isOutputDevice(deviceID) {
@@ -50,7 +70,6 @@ class AudioController {
     }
 
     private func getDeviceName(_ deviceID: AudioDeviceID) -> String? {
-
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -70,7 +89,6 @@ class AudioController {
     }
 
     private func setDefaultOutputDevice(_ deviceID: AudioDeviceID) -> Bool {
-
         var id = deviceID
 
         var address = AudioObjectPropertyAddress(
@@ -92,7 +110,6 @@ class AudioController {
     }
 
     private func isOutputDevice(_ deviceID: AudioDeviceID) -> Bool {
-
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
             mScope: kAudioDevicePropertyScopeOutput,
@@ -102,12 +119,16 @@ class AudioController {
         var dataSize: UInt32 = 0
         AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &dataSize)
 
-        let bufferList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
+        let bufferList = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(dataSize),
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
         defer { bufferList.deallocate() }
 
         AudioObjectGetPropertyData(deviceID, &address, 0, nil, &dataSize, bufferList)
 
-        let buffers = UnsafeMutableAudioBufferListPointer(bufferList)
+        let audioBufferList = bufferList.assumingMemoryBound(to: AudioBufferList.self)
+        let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
         var totalChannels: UInt32 = 0
 
         for buffer in buffers {
