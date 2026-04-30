@@ -6,6 +6,7 @@ class MenuController: NSObject {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let menu = NSMenu()
     let audioController = AudioController()
+    private var listenerBlock: AudioObjectPropertyListenerBlock?
 
     private var outputDeviceAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -20,7 +21,16 @@ class MenuController: NSObject {
         updateStatusIcon()
     }
 
-
+    deinit {
+        if let block = listenerBlock {
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &outputDeviceAddress,
+                DispatchQueue.main,
+                block
+            )
+        }
+    }
 
     func setupMenu() {
         let apolloItem = NSMenuItem(title: AppConfig.apolloLabel, action: #selector(switchToApollo), keyEquivalent: "")
@@ -41,13 +51,16 @@ class MenuController: NSObject {
     }
 
     func setupOutputDeviceListener() {
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.updateStatusIcon()
+        }
+        listenerBlock = block
         AudioObjectAddPropertyListenerBlock(
             AudioObjectID(kAudioObjectSystemObject),
             &outputDeviceAddress,
-            DispatchQueue.main
-        ) { [weak self] _, _ in
-            self?.updateStatusIcon()
-        }
+            DispatchQueue.main,
+            block
+        )
     }
 
     @objc func switchToApollo() {

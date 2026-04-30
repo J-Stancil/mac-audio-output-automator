@@ -76,16 +76,11 @@ class AudioController {
             mElement: kAudioObjectPropertyElementMain
         )
 
-        var deviceName: CFString?
-        var nameSize = UInt32(MemoryLayout<CFString?>.size)
+        var name: CFString = "" as CFString
+        var nameSize = UInt32(MemoryLayout<CFString>.size)
 
-        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &nameSize, &deviceName)
-
-        if status == noErr, let deviceName {
-            return deviceName as String
-        }
-
-        return nil
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &nameSize, &name)
+        return status == noErr ? name as String : nil
     }
 
     private func setDefaultOutputDevice(_ deviceID: AudioDeviceID) -> Bool {
@@ -112,12 +107,14 @@ class AudioController {
     private func isOutputDevice(_ deviceID: AudioDeviceID) -> Bool {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
-            mScope: kAudioDevicePropertyScopeOutput,
+            mScope: kAudioObjectPropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMain
         )
 
         var dataSize: UInt32 = 0
         AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &dataSize)
+
+        guard dataSize > 0 else { return false }
 
         let bufferList = UnsafeMutableRawPointer.allocate(
             byteCount: Int(dataSize),
